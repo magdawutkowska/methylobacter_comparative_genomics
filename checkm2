@@ -1,0 +1,1 @@
+checkm2 predict --threads 30 --input /scratch/wutkowska/methylobacter97_genomes_annotations --output-directory /scratch/wutkowska/methylobacter97_checkm2 --force --stdout
