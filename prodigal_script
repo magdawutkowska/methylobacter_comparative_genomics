@@ -1,0 +1,31 @@
+###running PRODIGAL v2.6.3
+###content of the script:
+
+
+
+#!/bin/bash
+
+# Directory containing .fna files
+input_dir="./genomes"
+# Directory to save the output
+output_dir="./prodigal_output"
+
+# Create output directory if it doesn't exist
+mkdir -p "$output_dir"
+
+# Loop through each .fna file in the input directory
+for fna_file in "$input_dir"/*.fna; do
+    # Extract the base name of the file (without directory and extension)
+    base_name=$(basename "$fna_file" .fna)
+    # Define the output file names
+    output_genes="$output_dir/${base_name}_genes.gbk"
+    output_proteins="$output_dir/${base_name}_proteins.faa"
+    output_nucleotides="$output_dir/${base_name}_nucleotides.ffn"
+    
+    # Run Prodigal
+    prodigal -i "$fna_file" -o "$output_genes" -a "$output_proteins" -d "$output_nucleotides"
+
+    echo "Processed $fna_file"
+done
+
+echo "All files processed."]
