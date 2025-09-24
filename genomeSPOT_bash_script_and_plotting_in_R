@@ -1,0 +1,222 @@
+###GenomeSPOT Workflow bash script
+###
+###
+
+#!/bin/bash
+
+# Script Title: GenomeSPOT Workflow
+# Description: Predicts growth conditions (oxygen, temperature, salinity, pH) for bacterial and archaeal genomes. https://github.com/cultivarium/genomespot
+# Author: Justus Nweze
+# Date: 24th January 2025
+# Version: 1.0
+
+
+# Step 1: Generate protein files using Prodigal
+cd ~/proj/Peat_soil/Methylobacter_hq_nr/Data
+mkdir -p Proteins  # Ensure the Proteins directory exists
+
+cd ~/proj/Peat_soil/Methylobacter_hq_nr/Data/Data/Reformatted
+
+for i in *.fa; do
+    prodigal -i "$i" -o ../../Proteins/"${i%.fa}.gff" -a ../../Proteins/"${i%.fa}.faa"
+done
+
+# Step 2: Activate GenomeSPOT environment
+conda activate GenomeSPOT
+
+~/GenomeSPOT
+
+# Define paths
+# put the genomes nuclotides and amino acids (gene call) in one folder
+PARENT_DIR="/proj/Peat_soil/Methylobacter_hq_nr/Data/Proteins"   # Directory containing the genome files
+OUTPUT_DIR="/home/nwezejus/proj/Peat_soil/Methylobacter_hq_nr/Data/GenomeSPOT"    # Directory to store the output
+MODELS_DIR="models"    # Path to the GenomeSPOT models directory
+
+# Create output directory if it doesn't exist
+mkdir -p "$OUTPUT_DIR"
+
+# Iterate over genomic files (.fa) in the parent directory
+for genomic_file in "$PARENT_DIR"/*.fa; do
+    # Derive the base name (e.g., MAG1) from the genomic file
+    genome_id=$(basename "$genomic_file" .fa)
+    
+    # Locate the corresponding protein file
+    protein_file="$PARENT_DIR/${genome_id}.faa"
+    
+    # Check if the protein file exists
+    if [[ -f "$protein_file" ]]; then
+        # Define output path for the current genome
+        output_path="$OUTPUT_DIR/$genome_id"
+        
+        # Run GenomeSPOT command
+        echo "Processing $genome_id..."
+        python -m genome_spot.genome_spot \
+            --models "$MODELS_DIR" \
+            --contigs "$genomic_file" \
+            --proteins "$protein_file" \
+            --output "$output_path"
+
+        if [ $? -eq 0 ]; then
+            echo "Completed processing $genome_id."
+        else
+            echo "Error processing $genome_id." >&2
+        fi
+    else
+        echo "Protein file missing for $genome_id" >&2
+    fi
+done
+
+
+
+
+#!/bin/bash
+
+# Directory where the .predictions.tsv files are located
+input_dir="/proj/Peat_soil/Methylobacter_hq_nr/Data/GenomeSPOT1"
+output_file="/proj/Peat_soil/Methylobacter_hq_nr/Data/GenomeSPOT_merged_file.tsv"
+
+# Create the output file and add the header (only once)
+head -n 1 "$input_dir"/MAG10.predictions.tsv | awk -v OFS="\t" '{print "filename", $0}' > "$output_file"
+
+# Loop over each .predictions.tsv file in the directory
+for file in "$input_dir"/*.predictions.tsv; do
+    # Extract the filename without the .predictions part
+    filename=$(basename "$file" .predictions.tsv)
+
+    # Skip the header and append the data from each file, adding the filename as the first column
+    tail -n +2 "$file" | awk -v fname="$filename" -v OFS="\t" '{print fname, $0}' >> "$output_file"
+done
+
+echo "Merge complete. Output saved to $output_file"
+
+
+
+
+
+###plotting GenomeSPOT data in R
+###
+###
+library(tidyverse)
+
+genomeSPOT <- read.table(file = "./GenomeSPOT_merged_file.tsv", 
+                            header = TRUE, sep = "\t", dec = ".")
+class(genomeSPOT)
+
+#change names
+genomeSPOT_newnames <- genomeSPOT %>%
+  mutate(filename = case_when(
+    filename == "MAG10" ~ "M. tundripaludum OWC-G53F",
+    filename == "MAG11" ~ "M. tundripaludum OWC-DMM",
+    filename == "MAG12" ~ "Candidatus M. oryzae KRF1",
+    filename == "MAG13" ~ "M. sp. DP16D_bin.19",
+    filename == "MAG14" ~ "M. sp. FW305_bin.9",
+    filename == "MAG15" ~ "M. tundripaludum Bin_16_1",
+    filename == "MAG16" ~ "M. sp. BlB1",
+    filename == "MAG17" ~ "M. tundripaludum Tobar13m-G39",
+    filename == "MAG18" ~ "M. sp. S3L5C",
+    filename == "MAG19" ~ "M. tundripaludum SO_2017_LW4 bin 69",
+    filename == "MAG20" ~ "M. sp. B4-02",
+    filename == "MAG21" ~ "M. psychrophilus Z-0021",
+    filename == "MAG22" ~ "M. sp. LacPavin_0818_WC45_MAG_43_7",
+    filename == "MAG23"	~ "M. sp. LacPavin_0419_WC53_MAG_49_11",
+    filename == "MAG24"	~ "M. sp. YRD-M1",
+    filename == "MAG25"	~ "M. sp. STD1_208",
+    filename == "MAG26"	~ "M. sp. U-2020 MAG003",
+    filename == "MAG27"	~ "Candidatus M. titanis K-2018 MAG008",
+    filename == "MAG28" ~ "Candidatus M. titanis D1-2020 MAG004",
+    filename == "MAG29"	~ "M. sp. E6_concoct.bin.28",
+    filename == "MAG30"	~ "M. sp. C13_maxbin.026sub",
+    filename == "MAG31" ~ "M. sp. C15_maxbin.01",
+    filename == "MAG32"	~ "M. sp. C19_maxbin.001",
+    filename == "MAG33"	~ "M. sp. Wu8",
+    filename == "MAG34"	~ "M. sp. Wu1",
+    filename == "MAG35"	~ "M. sp. SMAG_U4120",
+    filename == "MAG36"	~ "M. sp. SMAG_U4092",
+    filename == "MAG37"	~ "M. sp. SMAG_U4093",
+    filename == "MAG38"	~ "M. sp. CTOTU2501",
+    filename == "MAG39" ~ "M. sp. CTOTU2506",
+    filename == "MAG40"	~ "M. svalbardensis LS7T4",
+    filename == "MAG41"	~ "Candidatus M. favarea (METH)B2(1)",
+    filename == "MAG42" ~	"uncultured M. sp. Day2-5_bin-515",
+    filename == "MAG43"	~ "Candidatus M. oryzae LH-02apr19-193",
+    filename == "MAG44" ~ "Candidatus M. oryzae ZH-03apr19-95",
+    filename == "MAG1" ~ "M. tundripaludum SV96",
+    filename == "MAG2" ~ "M. marinus A45",
+    filename == "MAG3" ~ "M. luteus IMV-B-3098",
+    filename == "MAG4" ~ "M. tundripaludum 21/22",
+    filename == "MAG5" ~ "M. tundripaludum 31/32",
+    filename == "MAG6" ~ "M. sp. BBA5.1",
+    filename == "MAG7" ~ "M. sp. UBA6712",
+    filename == "MAG8" ~ "M. sp. UBA6696",
+    filename == "MAG9" ~ "M. sp. KS41",
+    TRUE ~ filename
+  ))
+
+allMethylobacter <- genomeSPOT_newnames %>%
+  filter(filename != "MAG45") %>% #Methylomicrobium sp used in another analysis 
+  filter(filename != "MAG46") #Methylomicrobium sp used in another analysis
+
+temp_allMethylobacter_opt <- allMethylobacter %>%
+  filter(units == "C") %>%
+  filter(target == "temperature_optimum")
+
+temp_allMethylobacter_opt$value <- as.numeric(temp_allMethylobacter_opt$value)
+  
+ggplot(data = temp_allMethylobacter_opt, aes((reorder(filename, value)), x = value)) +
+  geom_point() +
+  scale_x_continuous(limits = c(5, 40), breaks = seq(3, 40, by = 1)) +
+  labs(y= "Genome/Metagenome-assembled genome", x = "Optimal temperature [°C]") +
+  theme_light()
+
+###it turned out that these optimal temperatures and other values are expressed in non-uniform ways, as ranges, single points, different optima in different papers, therefor I'll just add them manually in the illustrator, while fixing italics for latin names
+# #adding the actual temperatures
+# mag1 <- c("M. tundripaludum SV96", "actual_optimal_temp", 23, 0, "C", "False", "None") #
+# mag2 <- c("M. marinus A45", "actual_optimal_temp", 37, 0, "C", "False", "None") #
+# mag21 <- c("M. psychrophilus Z-0021", "actual_optimal_temp", 5, 0, "C", "False", "None") #
+# 
+# df_actual <- c(mag1, mag2, mag21)
+# col.len=length(mag1)
+# actual_temps <- data.frame(matrix(data=df_actual, ncol = col.len, byrow = TRUE))
+# class(actual_temps)
+# names(actual_temps) <- colnames(temp_opt)
+# 
+# all_optimal <- rbind(temp_opt, actual_temps)
+# 
+# #add some sort of a colour here
+# ggplot(data = all_optimal, aes((reorder(filename, as.numeric(value))), x = as.numeric(value))) +
+#   geom_point() +
+#   labs(y= "Genome/Metagenome-assembled genome", x = "Optimal temperature [°C]") +
+#   theme_linedraw()
+
+
+
+###plotting pH
+pH_allMethylobacter_opt <- allMethylobacter %>%
+  filter(units == "pH") %>%
+  filter(target == "ph_optimum")
+
+pH_allMethylobacter_opt$value <- as.numeric(pH_allMethylobacter_opt$value)
+
+ggplot(data = pH_allMethylobacter_opt, aes((reorder(filename, value)), x = value)) +
+  geom_point() +
+  scale_x_continuous(limits = c(5.0, 9.0), breaks = seq(5.0, 9.0, by = 0.2)) +
+  labs(y= "Genome/Metagenome-assembled genome", x = "Optimal pH") +
+  theme_light()
+
+
+
+###plotting salinity  
+salinity_allMethylobacter_opt <- allMethylobacter %>%
+  filter(units == "% w/v NaCl") %>%
+  filter(target == "salinity_optimum")
+
+salinity_allMethylobacter_opt$value <- as.numeric(salinity_allMethylobacter_opt$value)
+
+ggplot(data = salinity_allMethylobacter_opt, aes((reorder(filename, value)), x = value)) +
+  geom_point() +
+  scale_x_continuous(limits = c(0.0, 3.0), breaks = seq(0.0, 3.0, by = 0.2)) +
+  labs(y= "Genome/Metagenome-assembled genome", x = "Optimal salinity [% w/v NaCl]") +
+  theme_light()
+
+
+#literature values are gathered in the Methylobacter_optima.xlsx
